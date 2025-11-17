@@ -1,0 +1,4 @@
+[submodule "Unity_AutoCompilation"]
+	path = Unity_AutoCompilation
+	url = https://github.com/ajcampbell1333/Claude_Unity_Auto-Compilation.git
+
