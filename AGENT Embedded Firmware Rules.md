@@ -85,5 +85,11 @@ All firmware examples should include:
 
 ---
 
+## Remember
+
+* **NEVER use backtick marks (`) in responses to the user** - they cause formatting issues in Cursor chat.
+
+---
+
 **Last Updated:** 2025-01-XX
 

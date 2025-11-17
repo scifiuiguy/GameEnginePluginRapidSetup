@@ -66,35 +66,38 @@ This guide addresses repository structure, Unity/Unreal project initialization, 
 ## Unity CLI Project Creation
 
 ### Current State
-Unity's CLI has **limited project creation capabilities**:
+Unity's CLI supports **fully automated project creation**:
 
-1. **Deprecated Method:** `Unity -createProject <path>` (removed in Unity 2019.3+)
-2. **Unity Hub CLI:** Limited availability, not officially documented
-3. **Manual Creation:** Most reliable method
+1. **Unity Editor Batch Mode:** `Unity.exe -batchmode -createProject <path>` - Fully automated, no user interaction required
+2. **Unity Hub CLI:** Requires user interaction (opens GUI dialog)
+3. **Template Repository:** Alternative approach for CI/CD (store pre-created template project)
 
 ### Recommended Approach
 
-**Option 1: Manual Creation (Most Reliable)**
-1. Create folder structure manually
-2. Add minimal Unity project files
-3. Open in Unity Editor (auto-initializes)
-
-**Option 2: Unity Hub CLI (If Available)**
+**Option 1: Unity Editor Batch Mode (Fully Automated - Recommended)**
 ```powershell
-# Check if Unity Hub CLI is available
-& "C:\Program Files\Unity Hub\Unity Hub.exe" --help
-
-# Create project (if supported)
-& "C:\Program Files\Unity Hub\Unity Hub.exe" --createProject "F:\[PROJECT-NAME]\[PROJECT-NAME]_Unity"
+# Unity Editor supports -createProject flag in batch mode
+& "C:\Program Files\Unity\Hub\Editor\[VERSION]\Editor\Unity.exe" -batchmode -quit -createProject "F:\[PROJECT-NAME]\[PROJECT-NAME]_Unity"
 ```
+- **Pros:** Fully automated, suitable for CI/CD, containers, and automated testing
+- **Cons:** Requires Unity Editor installation (not just Unity Hub)
+- **Use case:** Automated pipelines, unit testing, containerized builds
 
-**Option 3: Template-Based Script**
-Create a PowerShell script that:
-- Creates folder structure
-- Generates `ProjectSettings/ProjectVersion.txt`
-- Generates `ProjectSettings/ProjectSettings.asset` (minimal)
-- Creates `Assets/` directory
-- Initializes package structure
+**Option 2: Unity Hub CLI (Requires User Interaction)**
+```powershell
+# Unity Hub opens GUI dialog (user must click "CREATE PROJECT")
+& "C:\Program Files\Unity Hub\Unity Hub.exe" --create-project "F:\[PROJECT-NAME]\[PROJECT-NAME]_Unity" --name "[PROJECT-NAME]" --version "[VERSION]"
+```
+- **Pros:** Pre-fills project name and path
+- **Cons:** Requires user to click button in GUI
+- **Use case:** Manual project setup when Unity Editor not available
+
+**Option 3: Template Repository (For CI/CD)**
+- Store a pre-created Unity project template in a repository
+- Clone and customize for new projects
+- **Pros:** Fast, consistent, works in any environment
+- **Cons:** Requires maintaining template, version updates need template rollup
+- **Use case:** High-frequency project creation in CI/CD pipelines
 
 ### Unity Package Management Structure
 
@@ -256,7 +259,10 @@ This avoids fighting with engine metadata generation.
 
 ## Unity CLI Answer
 
-**Short Answer:** Unity CLI **cannot reliably create projects** in modern Unity versions. The `-createProject` flag was deprecated.
+**Short Answer:** Unity Editor **supports fully automated project creation** via `-batchmode -createProject` flags. Unity Hub CLI requires user interaction.
 
-**Best Practice:** Create folder structure + minimal files via script, then open in Unity Editor to complete initialization. This is the most reliable cross-platform approach.
+**Best Practice:** 
+- **For automation/CI/CD:** Use Unity Editor directly: `Unity.exe -batchmode -quit -createProject <path>`
+- **For manual setup:** Use Unity Hub (pre-fills fields but requires button click)
+- **For high-frequency CI/CD:** Consider template repository approach (clone pre-created project)
 

@@ -2,3 +2,7 @@
 	path = Unity_AutoCompilation
 	url = https://github.com/ajcampbell1333/Claude_Unity_Auto-Compilation.git
 
+[submodule "TurboLink"]
+	path = TurboLink
+	url = https://github.com/thejinchao/turbolink.git
+

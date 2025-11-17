@@ -33,6 +33,7 @@ These rules guide refactoring efforts to keep controllers thin, maintainable, an
 * Gather like members and methods into their own classes to be referenced by the controller via interfaces and OOP.
 * Services should own their dependencies. If a service is the only consumer of certain data structures, move ownership into the service.
 * Controllers should compose services, not duplicate their functionality.
+* When refactoring code blocks into helper methods, extract logical chunks into well-named helper methods to improve readability and maintainability.
 
 ---
 
@@ -89,13 +90,14 @@ These rules guide refactoring efforts to keep controllers thin, maintainable, an
 
 ---
 
-## Code Smells to Watch For
+## Best-Practice Notes
 
 * Methods with `"InitializeX"` / `"ShutdownX"` pairs that just call `X->Initialize()` / `X->Shutdown()` - remove them.
 * Methods that directly access registry/buffer that a service also uses - move to service.
 * Switch statements that appear in multiple places (construction, usage, cleanup) - use factory pattern.
 * Controller methods that are just "get service, call service method" - remove wrapper, expose service accessor.
 * Friend declarations that are only needed because wrapper methods exist - remove friend and wrapper.
+* Avoid unnecessary inheritance - prefer composition and interfaces over deep inheritance hierarchies.
 
 ---
 
@@ -161,10 +163,93 @@ If you comment out a line that has a compilation error, and the same error appea
 
 ## Remember
 
+* **NEVER use backtick marks (`) in responses to the user** - they cause formatting issues in Cursor chat.
 * Controllers are orchestrators, not implementers.
 * Services are domain experts, not general-purpose utilities.
 * Interfaces enable polymorphism, factories enable clean construction.
 * The goal is a thin controller that composes services, not a fat controller that does everything.
+
+---
+
+## Stream Data Processing Performance
+
+When building transport layers for API data streams (media: image/video/audio, metadata, or any continuous data stream), prioritize lowest-latency and high-performance patterns:
+
+### Data Models
+
+* **Use struct-based data models** for stream data instead of classes when possible - structs avoid heap allocation and reduce memory fragmentation.
+* Keep structs small and value-type focused - avoid `UObject` references or other heavy types within stream processing structs.
+* Use `const` and `constexpr` where possible to enable compiler optimizations.
+* Consider `TArrayView<T>` for zero-copy operations on stream buffers without ownership transfer.
+
+### Serialization/Deserialization
+
+* **Binary serialization** is fastest - prefer binary formats (FlatBuffers, MessagePack, Protobuf, custom binary) over text formats (JSON, XML) for high-frequency streams.
+* **FlatBuffers is recommended as the default** for stream data processing - provides zero-copy deserialization, JSON compatibility for debugging, and significant performance improvements. FlatBuffers works in Unreal but requires plugin integration due to Unreal's build system.
+* **Unreal's native `USTRUCT` system** - Excellent for Unreal-specific data with built-in reflection, Blueprint support, and network replication. However, for pure stream processing, FlatBuffers may offer better performance due to zero-copy access patterns.
+* Use streaming deserializers instead of loading entire documents into memory when JSON is required.
+* Pool serialization buffers - reuse `TArray<uint8>` or `FMemory::Malloc` allocations to avoid per-frame allocations.
+* For JSON fallback: Use rapidjson or similar high-performance libraries over slower alternatives.
+* Avoid reflection-based serialization in hot paths - use code generation, FlatBuffers, manual serialization, or Unreal's `USTRUCT` system (when Blueprint/network features are needed) for stream data.
+
+### Encryption
+
+* Use hardware-accelerated encryption when available (AES-NI, etc.).
+* Prefer symmetric encryption (AES) over asymmetric (RSA) for stream data - symmetric is orders of magnitude faster.
+* Process encryption in chunks rather than per-packet to reduce overhead.
+* Consider encrypting only metadata headers, leaving media payloads unencrypted if security requirements allow.
+
+### ORM and Database Access
+
+* **Avoid ORMs in stream processing paths** - use raw SQL or lightweight data access for high-frequency operations.
+* Use connection pooling and prepared statements for database streams.
+* Batch database operations when possible - group multiple inserts/updates into transactions.
+* Consider in-memory databases or caches (Redis, Memcached) for stream metadata that needs persistence.
+
+### General Stream Processing
+
+* **Avoid allocations in hot paths** - use object pooling (`FObjectPool`) for temporary objects created during stream processing.
+* Use raw pointers and `FMemory::Malloc`/`Free` for zero-copy operations when performance is critical (profile first).
+* Process streams in background threads - use `AsyncTask` or `FRunnable` to avoid blocking game thread.
+* Use `TArray<uint8>` with pre-allocated capacity or `FMemory::Malloc` for temporary buffers instead of frequent reallocations.
+* Profile with Unreal Insights - measure actual performance before optimizing, focus on allocation spikes and frame time.
+
+### Unreal-Specific Considerations
+
+* Use `TArray<uint8>` or `TArrayView<uint8>` for binary stream data instead of `FString` or `TCHAR*`.
+* Consider `FAsyncTask` or `FRunnableThread` for parallel stream processing.
+* Be mindful of Unreal's game thread requirements - marshal results back to game thread when needed using `AsyncTask(ENamedThreads::GameThread, ...)`.
+* Use `FMemory::Memcpy` for low-level memory operations when working with native data streams.
+* Leverage Unreal's `USTRUCT` system with `UPROPERTY` for serialization when you need reflection, but prefer manual binary serialization for hot paths.
+
+---
+
+## AI Model Integration with NIM Containers
+
+When integrating AI models via NVIDIA NIM (NVIDIA Inference Microservices) containers, use appropriate communication protocols based on deployment location:
+
+### gRPC vs REST for NIM Containers
+
+* **Local NIM containers: Use gRPC** - Lower latency, binary protocol (Protobuf), HTTP/2 multiplexing, and better performance for high-frequency inference requests.
+* **Cloud NIM containers: Use REST** - Simpler firewall/proxy traversal, wider compatibility, easier debugging with standard HTTP tools, and better suited for occasional requests over public networks.
+* **Hybrid approach:** Use gRPC for local inference pipelines and REST for cloud fallbacks or external API access.
+
+### gRPC in Unreal with TurboLink
+
+* **Plugin:** TurboLink ([GitHub](https://github.com/thejinchao/turbolink)) - Unreal Engine plugin for Google gRPC integration.
+* **Compatibility:** Supports Unreal Engine 4.27+ and 5.x (C++ and Blueprint).
+* **Installation:** 
+  * Add as git submodule to your Unreal project's `Plugins/` directory.
+  * **Important:** TurboLink has several open-source dependencies that must be installed separately. See the [TurboLink repository documentation](https://github.com/thejinchao/turbolink) for complete installation instructions and dependency requirements.
+* **Best Practices:**
+  * Use TurboLink's async gRPC function calls - never block the game thread.
+  * TurboLink automatically handles game thread marshaling for Blueprint callbacks.
+  * For C++ implementations, use `AsyncTask(ENamedThreads::GameThread, ...)` to marshal results back to game thread when updating UObject properties.
+  * Configure gRPC channels with appropriate timeouts and message size limits for your model outputs.
+  * Use TurboLink's streaming gRPC methods for real-time inference pipelines (e.g., video processing).
+  * Handle gRPC errors appropriately - TurboLink provides error callbacks in both C++ and Blueprint.
+  * For TLS connections, configure TurboLink's SSL credentials for secure local or cloud connections.
+* **Performance:** TurboLink provides efficient C++ bindings to gRPC, enabling low-latency communication with NIM containers while maintaining Unreal's threading model.
 
 ---
 
@@ -262,4 +347,22 @@ List all such instances in summaries of your work in chat when you're done. This
 * `TArray::Add(MoveTemp(...))` = zero-cost insert.
 * `const T&` = zero-cost read-only access.
 * `TWeakObjectPtr` = the only safe way to reference UObjects in async or long-lived contexts.
+
+---
+
+## Git Workflow
+
+* **Git initialization is automated** during project generation via `generate_unreal_project.ps1`.
+* **Note:** For Unreal projects, the git repository is initialized in `Plugins/[Project-Name]/`, not the project root.
+* **User handles all git operations** after initialization: `git add`, `git commit`, `git branch`, `git push`, etc. (both locally and remotely).
+* **AGENT should NOT** perform git operations (add, commit, push, branch) unless explicitly requested by the user.
+* **Exception:** Git initialization (`git init`) and related setup is handled automatically by the project generation script, which will prompt the user to choose between GitHub or local-only initialization.
+* When the generation script runs, it will:
+  1. Add a standard Unreal `.gitignore` file to the project root
+  2. Ask the user: "Would you like me to initialize the repository on GitHub or just locally?"
+  3. If GitHub is selected, attempt to create the repository using GitHub CLI (`gh`), or prompt for a manual repository URL
+  4. If local-only is selected, just run `git init` in `Plugins/[Project-Name]/`
+  5. If skip is selected, the user will initialize manually later
+* **CRITICAL:** If git initialization or any other automated git exception goes awry, **NEVER delete a git repository from the user's GitHub account**. Always prompt the user with the reason a repo should be deleted, and the user will delete it manually if approved.
+* **Cloud Agent Exception:** When operating as a cloud agent in unsupervised VM environments, see `AGENT Cloud Agents Rules.md` for workflow exceptions that allow independent git commits to feature branches.
 
