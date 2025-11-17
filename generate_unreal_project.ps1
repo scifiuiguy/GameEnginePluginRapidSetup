@@ -394,7 +394,7 @@ if ($GitChoice -eq "1" -or $GitChoice -eq "2") {
                     $GitHubUsername = gh api user --jq .login 2>$null
                     
                     # User is authenticated, try to create repo
-                    $RepoName = $ProjectName
+                    $RepoName = "${ProjectName}_Unreal"
                     
                     # Check if repo already exists
                     $RepoExists = gh repo view $RepoName 2>&1
@@ -469,7 +469,7 @@ if ($GitChoice -eq "1" -or $GitChoice -eq "2") {
             } else {
                 Write-Host "GitHub CLI (gh) not found. Please create the repository manually on GitHub." -ForegroundColor Yellow
                 Write-Host "After creating the repository, add the remote with: git remote add origin <URL>" -ForegroundColor Gray
-                Write-Host "Example: git remote add origin git@github.com:username/Proptical.git" -ForegroundColor Gray
+                Write-Host "Example: git remote add origin git@github.com:username/${ProjectName}_Unreal.git" -ForegroundColor Gray
             }
         }
     } catch {
