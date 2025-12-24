@@ -12,18 +12,56 @@ param(
 )
 
 # Get the project name from parent directory if not provided
+# The Unreal project should be created at the top-level directory (IDE workspace root)
+# Handle nested directory structures by detecting the workspace root
 if ([string]::IsNullOrEmpty($ProjectName)) {
     $CurrentDir = Get-Location
     $ParentDir = Split-Path -Path $CurrentDir -Parent
-    $ProjectName = Split-Path -Path $ParentDir -Leaf
+    
+    # Walk up the directory tree to find the workspace root
+    # Check if we're inside a "Setup" folder or other nested structure
+    $ProjectRoot = $ParentDir
+    $ParentDirName = Split-Path -Path $ProjectRoot -Leaf
+    
+    # If parent is "Setup", navigate up one more level
+    if ($ParentDirName -eq "Setup") {
+        $ProjectRoot = Split-Path -Path $ProjectRoot -Parent
+        Write-Host "Detected Setup folder, navigating to project root: $ProjectRoot" -ForegroundColor Cyan
+    }
+    
+    # Try to detect IDE workspace root from environment variable (if available)
+    # Cursor/VS Code typically sets workspace-related environment variables
+    if ($env:CURSOR_WORKSPACE_ROOT) {
+        $ProjectRoot = $env:CURSOR_WORKSPACE_ROOT
+        Write-Host "Detected IDE workspace root from environment: $ProjectRoot" -ForegroundColor Cyan
+    } elseif ($env:VSCODE_WORKSPACE_ROOT) {
+        $ProjectRoot = $env:VSCODE_WORKSPACE_ROOT
+        Write-Host "Detected IDE workspace root from environment: $ProjectRoot" -ForegroundColor Cyan
+    }
+    
+    $ProjectName = Split-Path -Path $ProjectRoot -Leaf
     Write-Host "Detected project name: $ProjectName" -ForegroundColor Cyan
 } else {
     $CurrentDir = Get-Location
     $ParentDir = Split-Path -Path $CurrentDir -Parent
+    
+    # Determine project root for path construction
+    $ProjectRoot = $ParentDir
+    $ParentDirName = Split-Path -Path $ProjectRoot -Leaf
+    if ($ParentDirName -eq "Setup") {
+        $ProjectRoot = Split-Path -Path $ProjectRoot -Parent
+    }
+    
+    # Check for IDE workspace root environment variable
+    if ($env:CURSOR_WORKSPACE_ROOT) {
+        $ProjectRoot = $env:CURSOR_WORKSPACE_ROOT
+    } elseif ($env:VSCODE_WORKSPACE_ROOT) {
+        $ProjectRoot = $env:VSCODE_WORKSPACE_ROOT
+    }
 }
 
-# Construct project path
-$ProjectPath = Join-Path $ParentDir "${ProjectName}_Unreal"
+# Construct project path at the top-level directory
+$ProjectPath = Join-Path $ProjectRoot "${ProjectName}_Unreal"
 $UProjectFile = Join-Path $ProjectPath "${ProjectName}.uproject"
 
 # Check if project already exists

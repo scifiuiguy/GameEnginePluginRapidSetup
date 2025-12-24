@@ -38,21 +38,27 @@ This guide addresses repository structure, Unity/Unreal project initialization, 
 ### Unreal Repository
 **Recommended:** `Plugins/[PROJECT-NAME]/` should be the **Git repository root** (within an Unreal project)
 
+**Important:** The Unreal project (`[PROJECT-NAME]_Unreal/`) must be created at the **top-level directory** (same level as `GameEnginePluginRapidSetup/`), not inside any subdirectories.
+
 **Structure:**
 ```
-[UnrealProject]/          ← Template project (not in git)
-├── Plugins/
-│   └── [PROJECT-NAME]/        ← Git repo root
-│       ├── .git/
-│       ├── .gitignore
-│       ├── README.md
-│       ├── LICENSE
-│       ├── [PROJECT-NAME].uplugin
-│       ├── Source/
-│       │   └── [PROJECT-NAME]/
-│       ├── Content/
-│       └── Resources/
-└── ...
+[PROJECT-NAME]/                    ← Project root
+├── GameEnginePluginRapidSetup/    ← Setup folder (template files)
+└── [PROJECT-NAME]_Unreal/         ← Unreal project (created at top level)
+    ├── Plugins/
+    │   └── [PROJECT-NAME]/        ← Git repo root
+    │       ├── .git/
+    │       ├── .gitignore
+    │       ├── README.md
+    │       ├── LICENSE
+    │       ├── [PROJECT-NAME].uplugin
+    │       ├── Source/
+    │       │   └── [PROJECT-NAME]/
+    │       ├── Content/
+    │       └── Resources/
+    ├── Source/
+    ├── Content/
+    └── [PROJECT-NAME].uproject
 ```
 
 **Rationale:**
@@ -60,6 +66,7 @@ This guide addresses repository structure, Unity/Unreal project initialization, 
 - Plugin can be version-controlled independently
 - Template project can be regenerated or shared separately
 - Matches Unreal's plugin management conventions
+- **Top-level placement ensures consistent project structure and avoids path confusion**
 
 ---
 

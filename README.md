@@ -67,10 +67,46 @@ When using this template, your project structure should follow:
 [PROJECT-NAME]/
 ├── GameEnginePluginRapidSetup/     ← This folder (template files)
 ├── [PROJECT-NAME]_Unity/            ← Unity repository root
-└── [PROJECT-NAME]_Unreal/          ← Unreal project (template)
+└── [PROJECT-NAME]_Unreal/          ← Unreal project (created at top level)
     └── Plugins/
         └── [PROJECT-NAME]/          ← Unreal plugin repository root
 ```
+
+**Important:** The Unreal project must be created at the **top-level directory** (same level as `GameEnginePluginRapidSetup/`), not inside any subdirectories. The generation script will automatically place it at the correct location.
+
+### Nested Directory Structures
+
+**Note:** The `GameEnginePluginRapidSetup` repository may be nested inside one or more subdirectories under the project root. For example:
+
+```
+[PROJECT-NAME]/                          ← IDE workspace root
+├── Setup/
+│   └── GameEnginePluginRapidSetup/      ← Nested one level
+│       └── ...
+├── [PROJECT-NAME]_Unity/
+└── [PROJECT-NAME]_Unreal/
+```
+
+Or even deeper nesting:
+
+```
+[PROJECT-NAME]/                          ← IDE workspace root
+├── Tools/
+│   └── Setup/
+│       └── GameEnginePluginRapidSetup/ ← Nested two levels
+│           └── ...
+├── [PROJECT-NAME]_Unity/
+└── [PROJECT-NAME]_Unreal/
+```
+
+**Project Name Detection:** The project name used for creating Unity and Unreal projects should always be derived from the **top-most root directory selected by the IDE** (the workspace root), not from the immediate parent of `GameEnginePluginRapidSetup`. 
+
+The generation scripts automatically detect the workspace root using the following methods (in order of priority):
+1. **IDE Environment Variables:** If available, uses `CURSOR_WORKSPACE_ROOT` or `VSCODE_WORKSPACE_ROOT` environment variables set by the IDE
+2. **Directory Navigation:** Walks up the directory tree, handling common nested structures (e.g., `Setup/GameEnginePluginRapidSetup/`)
+3. **Fallback:** Uses the immediate parent directory if no workspace root can be determined
+
+This ensures that projects are always created with the correct name and at the correct location, regardless of how deeply `GameEnginePluginRapidSetup` is nested.
 
 ## White-Labeling
 
