@@ -24,7 +24,7 @@ A white-label template repository for cross-platform game engine plugin developm
 
 When starting a new project, you can tell your AI assistant:
 - **"Generate this new plugin"** - Automatically runs both Unity AND Unreal project generation scripts
-- **"Generate this new unity plugin"** - Runs Unity project generation only (`generate_unity_project.ps1`)
+- **"Generate this new unity plugin"** - Generates a Unity package repo plus adjacent Unity plugin test project (`generate_unity_project.ps1`)
 - **"Generate this new unreal plugin"** - Runs Unreal project generation only (`generate_unreal_project.ps1`)
 - **"Generate Unity project"** - Alternative phrase for Unity-only generation
 - **"Generate Unreal project"** - Alternative phrase for Unreal-only generation
@@ -39,7 +39,7 @@ When starting a new project, you can tell your AI assistant:
    ```
 3. **Generate projects:**
    ```powershell
-   # Unity project (fully automated)
+   # Unity package repo + plugin test project (fully automated)
    .\GameEnginePluginRapidSetup\generate_unity_project.ps1
    
    # Unreal project (creates minimal structure)
@@ -66,7 +66,8 @@ When using this template, your project structure should follow:
 ```
 [PROJECT-NAME]/
 ├── GameEnginePluginRapidSetup/     ← This folder (template files)
-├── [PROJECT-NAME]_Unity/            ← Unity repository root
+├── [PROJECT-NAME]_Unity/            ← Unity UPM package repository root
+├── [PROJECT-NAME]_Unity_Plugin_Test/← Unity test project (references local package via manifest)
 └── [PROJECT-NAME]_Unreal/          ← Unreal project (created at top level)
     └── Plugins/
         └── [PROJECT-NAME]/          ← Unreal plugin repository root

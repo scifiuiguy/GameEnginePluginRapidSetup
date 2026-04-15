@@ -62,7 +62,7 @@
 
 1. Open Unity and go to **Window > Package Manager**
 2. Click the **+** button and select **Add package from git URL**
-3. Enter: `https://github.com/[USERNAME]/[PROJECT-NAME]_Unity.git?path=/Assets/[PROJECT-NAME]`
+3. Enter: `https://github.com/[USERNAME]/[PROJECT-NAME]_Unity.git`
 4. Click **Add**
 
 ### Via Git Submodule
@@ -75,8 +75,11 @@ git submodule add https://github.com/[USERNAME]/[PROJECT-NAME]_Unity.git [PROJEC
 ### Manual Installation
 
 1. Download or clone this repository
-2. Copy the `Assets/[PROJECT-NAME]` folder into your Unity project's `Assets` folder
-3. Unity will automatically import the package
+2. In your Unity test project's `Packages/manifest.json`, add:
+   ```json
+   "[PACKAGE-ID]": "file:../../[PROJECT-NAME]_Unity"
+   ```
+3. Reopen Unity so Package Manager resolves the local package
 
 ---
 

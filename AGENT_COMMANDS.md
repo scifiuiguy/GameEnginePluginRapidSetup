@@ -4,15 +4,42 @@ This document defines standard commands that AGENT should recognize when working
 
 ## Project Generation Commands
 
+### Command-to-Script Mapping
+
+| Command Phrase | Script Workflow |
+| --- | --- |
+| "Generate this new plugin" | `.\generate_unity_project.ps1 -UnityLayout Package` then `.\generate_unreal_project.ps1` |
+| "Generate this new unity plugin" | `.\generate_unity_project.ps1 -UnityLayout Package` |
+| "Generate this new unity package" | `.\generate_unity_project.ps1 -UnityLayout Package` |
+| "Generate Unity plugin/package" | `.\generate_unity_project.ps1 -UnityLayout Package` |
+| "Create a new Unity plugin/package for me" | `.\generate_unity_project.ps1 -UnityLayout Package` |
+| "Generate Unity project" | `.\generate_unity_project.ps1 -UnityLayout Project` |
+| "Create a new Unity project for me" | `.\generate_unity_project.ps1 -UnityLayout Project` |
+| "Generate this new unreal plugin" | `.\generate_unreal_project.ps1` |
+| "Generate Unreal project" | `.\generate_unreal_project.ps1` |
+
 ### Command Variations
 
 - **"Generate this new plugin"** → Generate both Unity AND Unreal projects
-- **"Generate this new unity plugin"** → Generate Unity project only
+- **"Generate this new unity plugin"** → Generate Unity package/plugin workflow only
+- **"Generate this new unity package"** → Generate Unity package/plugin workflow only
+- **"Generate Unity plugin/package"** → Generate Unity package/plugin workflow only
+- **"Create a new Unity plugin/package for me"** → Generate Unity package/plugin workflow only
 - **"Generate this new unreal plugin"** → Generate Unreal project only
-- **"Generate Unity project"** → Generate Unity project only
+- **"Generate Unity project"** → Generate Unity project workflow only
+- **"Create a new Unity project for me"** → Generate Unity project workflow only
 - **"Generate Unreal project"** → Generate Unreal project only
 
-### "Generate this new plugin" / "Generate Unity project" / "Generate this new unity plugin"
+### Unity Workflow Mapping (Project vs Package)
+
+For Unity requests, AGENT must map phrasing to `-UnityLayout` explicitly:
+
+- **Project phrasing** (`"Generate Unity project"`, `"Create a new Unity project for me"`)  
+  → run `generate_unity_project.ps1 -UnityLayout Project`
+- **Package/plugin phrasing** (`"Generate this new unity plugin"`, `"Generate this new unity package"`, `"Generate Unity plugin/package"`, `"Create a new Unity plugin/package for me"`)  
+  → run `generate_unity_project.ps1 -UnityLayout Package`
+
+### "Generate this new plugin" / Unity-specific commands
 
 When the user requests to generate a Unity project (any of the above Unity-specific commands), AGENT should:
 
@@ -22,11 +49,16 @@ When the user requests to generate a Unity project (any of the above Unity-speci
 
 2. **Execute Unity project generation:**
    ```powershell
-   .\generate_unity_project.ps1
+   # Project mode
+   .\generate_unity_project.ps1 -UnityLayout Project
    ```
-   Or if Unity version is specified:
+   For package/plugin workflow:
    ```powershell
-   .\generate_unity_project.ps1 -UnityVersion [VERSION]
+   .\generate_unity_project.ps1 -UnityLayout Package
+   ```
+   Or with Unity version:
+   ```powershell
+   .\generate_unity_project.ps1 -UnityLayout [Project|Package] -UnityVersion [VERSION]
    ```
 
 3. **Handle existing directories:**
@@ -54,7 +86,8 @@ When the user requests to generate a Unity project (any of the above Unity-speci
    - **Note:** After initialization, user handles all git operations (add, commit, push, branch). AGENT should NOT perform git operations unless explicitly requested.
 
 6. **Next steps (inform user):**
-   - Open the project in Unity Hub
+   - **Project mode:** open `[PROJECT-NAME]_Unity` in Unity Hub
+   - **Package mode:** open `[PROJECT-NAME]_Unity_Plugin_Test` in Unity Hub and iterate against local package repo `[PROJECT-NAME]_Unity`
    - Copy files from `Unity_AutoCompilation/` submodule (see AGENT Unity Rules.md)
    - Follow the setup guide for package structure configuration
 
@@ -108,9 +141,13 @@ When the user requests to generate an Unreal project (any of the above Unreal-sp
 ### Standard Phrases to Recognize
 
 - **"Generate this new plugin"** → Run both `generate_unity_project.ps1` AND `generate_unreal_project.ps1`
-- **"Generate this new unity plugin"** → Run `generate_unity_project.ps1` only
+- **"Generate this new unity plugin"** → Run `generate_unity_project.ps1 -UnityLayout Package`
+- **"Generate this new unity package"** → Run `generate_unity_project.ps1 -UnityLayout Package`
+- **"Generate Unity plugin/package"** → Run `generate_unity_project.ps1 -UnityLayout Package`
+- **"Create a new Unity plugin/package for me"** → Run `generate_unity_project.ps1 -UnityLayout Package`
 - **"Generate this new unreal plugin"** → Run `generate_unreal_project.ps1` only
-- **"Generate Unity project"** → Run `generate_unity_project.ps1` only
+- **"Generate Unity project"** → Run `generate_unity_project.ps1 -UnityLayout Project`
+- **"Create a new Unity project for me"** → Run `generate_unity_project.ps1 -UnityLayout Project`
 - **"Generate Unreal project"** → Run `generate_unreal_project.ps1` only
 - **"Set up [Project-Name]"** → Full project setup workflow
 - **"Initialize [Project-Name]"** → Full project initialization
@@ -123,6 +160,7 @@ When AGENT sees these commands, it should understand:
 2. **Goal:** Generate the Unity (and eventually Unreal) project structure
 3. **Location:** Scripts are in `GameEnginePluginRapidSetup/` subdirectory
 4. **Output:** Projects should be created in parent directory as `[Project-Name]_Unity/` and `[Project-Name]_Unreal/`
+   - In Unity **Package** mode, output is split into `[Project-Name]_Unity/` (package repo) and `[Project-Name]_Unity_Plugin_Test/` (test project)
 
 ## Script Location
 
@@ -176,7 +214,17 @@ If generation fails for other reasons, AGENT should:
 
 **AGENT should:**
 1. Confirm current directory structure
-2. Run `.\generate_unity_project.ps1`
+2. Run `.\generate_unity_project.ps1 -UnityLayout Package`
+3. Report success/failure
+4. Provide next steps for Unity package + test project setup
+
+### Example 2b: Generate Unity Project Only
+
+**User:** "Create a new Unity project for me"
+
+**AGENT should:**
+1. Confirm current directory structure
+2. Run `.\generate_unity_project.ps1 -UnityLayout Project`
 3. Report success/failure
 4. Provide next steps for Unity project setup
 

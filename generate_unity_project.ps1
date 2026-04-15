@@ -6,9 +6,15 @@
 param(
     [string]$UnityVersion = "",
     [string]$ProjectName = "",
+    [ValidateSet("Project", "Package", "")]
+    [string]$UnityLayout = "",
     [ValidateSet("GitHub", "Local", "Skip", "")]
     [string]$GitInit = ""
 )
+
+if ([string]::IsNullOrEmpty($UnityLayout)) {
+    $UnityLayout = "Project"
+}
 
 # Get the project name from parent directory if not provided
 # The Unity project should be created at the top-level directory (IDE workspace root)
@@ -60,8 +66,19 @@ if ([string]::IsNullOrEmpty($ProjectName)) {
     }
 }
 
-# Construct project path at the top-level directory
-$ProjectPath = Join-Path $ProjectRoot "${ProjectName}_Unity"
+$IsPackageMode = $UnityLayout -eq "Package"
+$PackagePath = $null
+if ($IsPackageMode) {
+    # Package mode:
+    # - Package repo root: [ProjectName]_Unity
+    # - Unity test project: [ProjectName]_Unity_Plugin_Test
+    $PackagePath = Join-Path $ProjectRoot "${ProjectName}_Unity"
+    $ProjectPath = Join-Path $ProjectRoot "${ProjectName}_Unity_Plugin_Test"
+} else {
+    # Project mode:
+    # - Single Unity project repo: [ProjectName]_Unity
+    $ProjectPath = Join-Path $ProjectRoot "${ProjectName}_Unity"
+}
 
 # Check if project already exists
 if (Test-Path $ProjectPath) {
@@ -83,6 +100,24 @@ if (Test-Path $ProjectPath) {
         Write-Host "  2. Use a different project name" -ForegroundColor White
         Write-Host "  3. Continue with the existing directory (manual setup required)" -ForegroundColor White
         exit 1
+    }
+}
+
+# In package mode, package repo path must also be safe to create/use.
+if ($IsPackageMode -and (Test-Path $PackagePath)) {
+    $ExistingPackageFiles = Get-ChildItem -Path $PackagePath -Force -ErrorAction SilentlyContinue
+    if ($ExistingPackageFiles.Count -gt 0) {
+        Write-Host "ERROR: Package directory already exists and contains files: $PackagePath" -ForegroundColor Red
+        Write-Host "File count: $($ExistingPackageFiles.Count)" -ForegroundColor Yellow
+        Write-Host ""
+        Write-Host "AGENT has been instructed not to destroy existing files." -ForegroundColor Yellow
+        Write-Host "Please choose how to proceed:" -ForegroundColor Cyan
+        Write-Host "  1. Remove the existing directory manually and run this script again" -ForegroundColor White
+        Write-Host "  2. Use a different project name" -ForegroundColor White
+        Write-Host "  3. Continue with the existing directory (manual setup required)" -ForegroundColor White
+        exit 1
+    } else {
+        Remove-Item -Path $PackagePath -Force -ErrorAction Stop
     }
 }
 
@@ -190,9 +225,19 @@ if ([string]::IsNullOrEmpty($UnityVersion) -and $null -eq $UnityEditorExe) {
 }
 
 Write-Host ""
-Write-Host "Creating Unity project..." -ForegroundColor Cyan
+if ($IsPackageMode) {
+    Write-Host "Creating Unity package + plugin test project..." -ForegroundColor Cyan
+} else {
+    Write-Host "Creating Unity project..." -ForegroundColor Cyan
+}
 Write-Host "  Project Name: $ProjectName" -ForegroundColor White
-Write-Host "  Project Path: $ProjectPath" -ForegroundColor White
+if ($IsPackageMode) {
+    Write-Host "  Test Project Path: $ProjectPath" -ForegroundColor White
+    Write-Host "  Package Repo Path: $PackagePath" -ForegroundColor White
+} else {
+    Write-Host "  Project Path: $ProjectPath" -ForegroundColor White
+}
+Write-Host "  Unity Layout: $UnityLayout" -ForegroundColor White
 Write-Host "  Unity Version: $UnityVersion" -ForegroundColor White
 Write-Host ""
 
@@ -313,11 +358,104 @@ if ($null -ne $UnityEditorExe) {
 # Final verification and git setup
 if ($ProjectCreated) {
     Write-Host ""
-    Write-Host "Project structure verified." -ForegroundColor Green
+    if ($IsPackageMode) {
+        Write-Host "Test project structure verified." -ForegroundColor Green
+
+        # Create package repository scaffold
+        if (-not (Test-Path $PackagePath)) {
+            New-Item -Path $PackagePath -ItemType Directory | Out-Null
+            Write-Host "Created package repository root: $PackagePath" -ForegroundColor Green
+        }
+        foreach ($dirName in @("Editor", "Runtime", "Documentation~", "Samples~")) {
+            $dirPath = Join-Path $PackagePath $dirName
+            if (-not (Test-Path $dirPath)) {
+                New-Item -Path $dirPath -ItemType Directory | Out-Null
+            }
+        }
+        $PackageId = "com.scifiuiguy." + ($ProjectName.ToLower() -replace "[^a-z0-9]+", "-")
+        $PackageManifestPath = Join-Path $PackagePath "package.json"
+        if (-not (Test-Path $PackageManifestPath)) {
+            $PackageManifest = @"
+{
+  "name": "$PackageId",
+  "version": "0.0.1",
+  "displayName": "$ProjectName Unity",
+  "description": "Unity package for $ProjectName.",
+  "unity": "2022.3",
+  "author": {
+    "name": "[AUTHOR-NAME]",
+    "url": "https://github.com/[USERNAME]"
+  }
+}
+"@
+            $PackageManifest | Set-Content $PackageManifestPath -NoNewline
+            Write-Host "Created package manifest: $PackageManifestPath" -ForegroundColor Green
+        }
+        $RuntimeAsmdefPath = Join-Path $PackagePath "Runtime\$ProjectName.Runtime.asmdef"
+        if (-not (Test-Path $RuntimeAsmdefPath)) {
+            $RuntimeAsmdef = @"
+{
+  "name": "$ProjectName.Runtime",
+  "rootNamespace": "$ProjectName",
+  "references": [],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}
+"@
+            $RuntimeAsmdef | Set-Content $RuntimeAsmdefPath -NoNewline
+        }
+        $EditorAsmdefPath = Join-Path $PackagePath "Editor\$ProjectName.Editor.asmdef"
+        if (-not (Test-Path $EditorAsmdefPath)) {
+            $EditorAsmdef = @"
+{
+  "name": "$ProjectName.Editor",
+  "rootNamespace": "$ProjectName.Editor",
+  "references": [
+    "$ProjectName.Runtime"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}
+"@
+            $EditorAsmdef | Set-Content $EditorAsmdefPath -NoNewline
+        }
+        $PackageReadmePath = Join-Path $PackagePath "README.md"
+        if (-not (Test-Path $PackageReadmePath)) {
+            @"
+# $PackageId
+
+UPM package repository for $ProjectName.
+
+This folder is the package repo root.
+Use the sibling Unity test project at:
+
+- ${ProjectName}_Unity_Plugin_Test
+"@ | Set-Content $PackageReadmePath -NoNewline
+        }
+    } else {
+        Write-Host "Project structure verified." -ForegroundColor Green
+    }
     
     # Add .gitignore file
     $GitIgnoreSource = Join-Path $PSScriptRoot "unity.gitignore"
-    $GitIgnoreDest = Join-Path $ProjectPath ".gitignore"
+    $RepoRootPath = if ($IsPackageMode) { $PackagePath } else { $ProjectPath }
+    $GitIgnoreDest = Join-Path $RepoRootPath ".gitignore"
     
     if (Test-Path $GitIgnoreSource) {
         Copy-Item -Path $GitIgnoreSource -Destination $GitIgnoreDest -Force
@@ -328,7 +466,7 @@ if ($ProjectCreated) {
     
     # Add README template and replace placeholders
     $ReadmeSource = Join-Path $PSScriptRoot "Unity_README_template.md"
-    $ReadmeDest = Join-Path $ProjectPath "README.md"
+    $ReadmeDest = Join-Path $RepoRootPath "README.md"
     
     if (Test-Path $ReadmeSource) {
         # Read template content
@@ -407,7 +545,7 @@ if ($ProjectCreated) {
     
     if ($GitChoice -eq "1" -or $GitChoice -eq "2") {
         # Initialize local git repository
-        Push-Location $ProjectPath
+        Push-Location $RepoRootPath
         try {
             if (Test-Path ".git") {
                 Write-Host "Git repository already exists. Skipping git init." -ForegroundColor Yellow
@@ -473,9 +611,9 @@ if ($ProjectCreated) {
                             
                             # Update README crosslink to Unreal plugin if it exists (use already-fetched username)
                             if (-not [string]::IsNullOrEmpty($GitHubUsername)) {
-                                $UnrealPluginPath = Join-Path (Split-Path $ProjectPath -Parent) "${ProjectName}_Unreal\Plugins\$ProjectName"
+                                $UnrealPluginPath = Join-Path (Split-Path $RepoRootPath -Parent) "${ProjectName}_Unreal\Plugins\$ProjectName"
                                 if (Test-Path (Join-Path $UnrealPluginPath "README.md")) {
-                                    $ReadmePath = Join-Path $ProjectPath "README.md"
+                                    $ReadmePath = Join-Path $RepoRootPath "README.md"
                                     if (Test-Path $ReadmePath) {
                                         $ReadmeContent = Get-Content $ReadmePath -Raw
                                         $UnrealRepoUrl = "https://github.com/$GitHubUsername/$ProjectName"
@@ -515,12 +653,40 @@ if ($ProjectCreated) {
         }
     }
     
+    if ($IsPackageMode) {
+        # Wire test project manifest to local package repo (file reference)
+        $ManifestPath = Join-Path $ProjectPath "Packages\manifest.json"
+        if (Test-Path $ManifestPath) {
+            try {
+                $Manifest = Get-Content $ManifestPath -Raw | ConvertFrom-Json
+                if ($null -eq $Manifest.dependencies) {
+                    $Manifest | Add-Member -MemberType NoteProperty -Name "dependencies" -Value ([ordered]@{})
+                }
+                $ManifestDir = Split-Path -Path $ManifestPath -Parent
+                $ManifestDirUri = New-Object System.Uri((Resolve-Path $ManifestDir).Path + [System.IO.Path]::DirectorySeparatorChar)
+                $PackageUri = New-Object System.Uri((Resolve-Path $PackagePath).Path + [System.IO.Path]::DirectorySeparatorChar)
+                $RelativePackagePath = $ManifestDirUri.MakeRelativeUri($PackageUri).ToString().TrimEnd("/")
+                $Manifest.dependencies | Add-Member -MemberType NoteProperty -Name $PackageId -Value ("file:" + $RelativePackagePath) -Force
+                ($Manifest | ConvertTo-Json -Depth 20) | Set-Content $ManifestPath -NoNewline
+                Write-Host "Linked test project manifest to local package: $PackageId -> file:$RelativePackagePath" -ForegroundColor Green
+            } catch {
+                Write-Host "WARNING: Could not patch test project manifest automatically: $($_.Exception.Message)" -ForegroundColor Yellow
+            }
+        }
+    }
+
     Write-Host ""
     Write-Host "Next steps:" -ForegroundColor Cyan
-    Write-Host "  1. Copy files from Unity_AutoCompilation/ submodule (see AGENT Unity Rules.md)" -ForegroundColor White
-    Write-Host "  2. Configure package structure (see CROSS-PLATFORM-GAME-ENGINE-PROJECT-SETUP-GUIDE.md)" -ForegroundColor White
+    if ($IsPackageMode) {
+        Write-Host "  1. Package repo created at: $PackagePath" -ForegroundColor White
+        Write-Host "  2. Test project created at: $ProjectPath" -ForegroundColor White
+        Write-Host "  3. Copy files from Unity_AutoCompilation/ submodule (see AGENT Unity Rules.md)" -ForegroundColor White
+    } else {
+        Write-Host "  1. Unity project created at: $ProjectPath" -ForegroundColor White
+        Write-Host "  2. Copy files from Unity_AutoCompilation/ submodule (see AGENT Unity Rules.md)" -ForegroundColor White
+    }
     if ($GitChoice -eq "3") {
-        Write-Host "  3. Initialize git repository manually: cd $ProjectPath && git init" -ForegroundColor White
+        Write-Host "  4. Initialize git repository manually: cd $RepoRootPath && git init" -ForegroundColor White
     }
 }
 

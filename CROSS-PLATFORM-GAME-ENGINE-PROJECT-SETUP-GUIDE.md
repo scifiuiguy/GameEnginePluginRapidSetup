@@ -9,31 +9,32 @@ This guide addresses repository structure, Unity/Unreal project initialization, 
 ## Repository Root Location Recommendations
 
 ### Unity Repository
-**Recommended:** `[PROJECT-NAME]_Unity/` should be the **Git repository root**
+**Recommended:** Use a split layout:
+- `[PROJECT-NAME]_Unity/` = **UPM package repository root**
+- `[PROJECT-NAME]_Unity_Plugin_Test/` = Unity **test project** referencing the package by local manifest path
 
 **Structure:**
 ```
-[PROJECT-NAME]_Unity/          ← Git repo root
-├── .git/
-├── .gitignore
-├── README.md
-├── LICENSE
-├── Assets/
-│   └── [PROJECT-NAME]/        ← Your package code here
-│       ├── Runtime/
-│       ├── Editor/
-│       └── package.json  ← Unity Package Manager manifest
-├── Packages/
-├── ProjectSettings/
-└── ...
+[PROJECT-NAME]/
+├── [PROJECT-NAME]_Unity/                 ← Package repo root (git)
+│   ├── .git/
+│   ├── package.json
+│   ├── Runtime/
+│   ├── Editor/
+│   ├── Samples~/
+│   └── Documentation~/
+└── [PROJECT-NAME]_Unity_Plugin_Test/     ← Unity test project (not typically pushed)
+    ├── Packages/
+    │   └── manifest.json  (contains file:../../[PROJECT-NAME]_Unity)
+    ├── Assets/
+    └── ProjectSettings/
 ```
 
 **Rationale:**
-- Unity projects are self-contained ecosystems
-- Package management works best when the repo root = Unity project root
-- Standard Unity `.gitignore` works out-of-the-box
-- Developers clone and open directly in Unity Hub
-- CI/CD can build/test the project directly
+- Keeps the package clean for UPM distribution
+- Prevents Unity project metadata from polluting package source
+- Supports fast local iteration via file-based manifest dependency
+- Allows each developer to keep or discard the test project independently
 
 ### Unreal Repository
 **Recommended:** `Plugins/[PROJECT-NAME]/` should be the **Git repository root** (within an Unreal project)
@@ -112,28 +113,19 @@ For a Unity package that conforms to Unity Package Manager:
 
 ```
 [PROJECT-NAME]_Unity/
-├── Assets/
-│   └── [PROJECT-NAME]/
-│       ├── package.json          ← Package manifest
-│       ├── Runtime/
-│       │   ├── Scripts/
-│       │   └── [PROJECT-NAME].asmdef  ← Assembly definition
-│       ├── Editor/
-│       │   ├── Scripts/
-│       │   └── [PROJECT-NAME].Editor.asmdef
-│       ├── Samples~/
-│       │   └── DemoScene/
-│       └── Documentation~/
-│           └── [PROJECT-NAME].md
-├── Packages/
-│   └── manifest.json             ← Project dependencies
-└── ProjectSettings/
+├── package.json
+├── Runtime/
+│   └── [PROJECT-NAME].Runtime.asmdef
+├── Editor/
+│   └── [PROJECT-NAME].Editor.asmdef
+├── Samples~/
+└── Documentation~/
 ```
 
 **Key Files:**
-- `Assets/[PROJECT-NAME]/package.json` - Defines package metadata, dependencies
-- `Assets/[PROJECT-NAME]/Runtime/[PROJECT-NAME].asmdef` - Assembly definition for runtime code
-- `Packages/manifest.json` - Project-level package dependencies
+- `[PROJECT-NAME]_Unity/package.json` - Defines package metadata, dependencies
+- `[PROJECT-NAME]_Unity/Runtime/*.asmdef` - Runtime assembly definitions
+- `[PROJECT-NAME]_Unity_Plugin_Test/Packages/manifest.json` - file-based local package reference
 
 ---
 
