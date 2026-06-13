@@ -377,16 +377,14 @@ When generating new code, maintain awareness of all instances of **NOOP** parts 
 
 ## Git Workflow
 
-* **Git initialization is automated** during project generation via `generate_unity_project.ps1`.
-* **User handles all git operations** after initialization: `git add`, `git commit`, `git branch`, `git push`, etc. (both locally and remotely).
-* **AGENT should NOT** perform git operations (add, commit, push, branch) unless explicitly requested by the user.
-* **Exception:** Git initialization (`git init`) and related setup is handled automatically by the project generation script, which will prompt the user to choose between GitHub or local-only initialization.
-* When the generation script runs, it will:
-  1. Add a standard Unity `.gitignore` file
-  2. Ask the user: "Would you like me to initialize the repository on GitHub or just locally?"
-  3. If GitHub is selected, attempt to create the repository using GitHub CLI (`gh`), or prompt for a manual repository URL
-  4. If local-only is selected, just run `git init`
-  5. If skip is selected, the user will initialize manually later
+* **Project/plugin creation exception:** During initial project or plugin creation, AGENT may run `git init` and add the standard `.gitignore` **without asking**.
+* **Commits and remote operations require permission:** AGENT must **not** perform `git commit`, `git push`, GitHub repo creation, or any operation affecting the **remote** unless the user explicitly requests it.
+* **Generation scripts:** `generate_unity_project.ps1` may still interactively prompt for GitHub vs local vs skip; AGENT manual setup follows the same permission model in `AGENT_COMMANDS.md` (**AGENT Git Permissions**).
 * **CRITICAL:** If git initialization or any other automated git exception goes awry, **NEVER delete a git repository from the user's GitHub account**. Always prompt the user with the reason a repo should be deleted, and the user will delete it manually if approved.
 * **Cloud Agent Exception:** When operating as a cloud agent in unsupervised VM environments, see `AGENT Cloud Agents Rules.md` for workflow exceptions that allow independent git commits to feature branches.
 
+---
+
+## Python Script Bulk-Edit Policy
+
+See `AGENT_COMMANDS.md` (**Python Script Bulk-Edit Policy**). Before using a Python script to transform a text-based file, ask the user for permission to create a local commit of that file first unless they explicitly requested script-based editing.

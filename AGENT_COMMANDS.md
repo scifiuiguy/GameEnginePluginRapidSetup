@@ -77,13 +77,11 @@ When the user requests to generate a Unity project (any of the above Unity-speci
    - Checks for Unity project structure (ProjectSettings/ or Assets/ folders)
    - Reports success once project is detected
 
-5. **Git initialization (automated):**
-   - Script automatically adds a standard Unity `.gitignore` file
-   - Script prompts user: "Would you like me to initialize the repository on GitHub or just locally?"
-   - **Option 1 (GitHub):** Attempts to create GitHub repository using GitHub CLI (`gh`), or prompts for manual repository URL
-   - **Option 2 (Local only):** Runs `git init` in the project directory
-   - **Option 3 (Skip):** User will initialize manually later
-   - **Note:** After initialization, user handles all git operations (add, commit, push, branch). AGENT should NOT perform git operations unless explicitly requested.
+5. **Git initialization (project/plugin creation):**
+   - During project or plugin **creation**, AGENT may run `git init` and add the standard `.gitignore` **without asking** (see **AGENT Git Permissions** below).
+   - **Remote setup** (GitHub repo creation, `git push`, initial commit that affects remote) **requires user permission**.
+   - The generation script may still prompt for GitHub vs local vs skip when run interactively; AGENT manual setup follows **AGENT Git Permissions**.
+   - After initialization, user handles ongoing git operations unless explicitly requested.
 
 6. **Next steps (inform user):**
    - **Project mode:** open `[PROJECT-NAME]_Unity` in Unity Hub
@@ -123,14 +121,12 @@ When the user requests to generate an Unreal project (any of the above Unreal-sp
    - Verifies Source module structure
    - Confirms UBT project file generation
 
-6. **Git initialization (automated):**
-   - Script automatically adds a standard Unreal `.gitignore` file to the project root
-   - **Note:** For Unreal projects, the git repository is initialized in `Plugins/[Project-Name]/`, not the project root
-   - Script prompts user: "Would you like me to initialize the repository on GitHub or just locally?"
-   - **Option 1 (GitHub):** Attempts to create GitHub repository using GitHub CLI (`gh`), or prompts for manual repository URL
-   - **Option 2 (Local only):** Runs `git init` in `Plugins/[Project-Name]/`
-   - **Option 3 (Skip):** User will initialize manually later
-   - **Note:** After initialization, user handles all git operations (add, commit, push, branch). AGENT should NOT perform git operations unless explicitly requested.
+6. **Git initialization (project/plugin creation):**
+   - During project or plugin **creation**, AGENT may run `git init` and add the standard `.gitignore` **without asking** (see **AGENT Git Permissions** below).
+   - **Note:** For Unreal projects, the git repository is initialized in `Plugins/[Project-Name]/`, not the project root.
+   - **Remote setup** (GitHub repo creation, `git push`, initial commit that affects remote) **requires user permission**.
+   - The generation script may still prompt for GitHub vs local vs skip when run interactively; AGENT manual setup follows **AGENT Git Permissions**.
+   - After initialization, user handles ongoing git operations unless explicitly requested.
 
 7. **Next steps (inform user):**
    - Open the .uproject file in Unreal Editor
@@ -238,3 +234,68 @@ If generation fails for other reasons, AGENT should:
 3. Report success/failure
 4. Provide next steps for Unreal project setup
 
+## AGENT Git Permissions
+
+Git rules distinguish **local repo bootstrap** (allowed on creation) from **commits and remote operations** (require permission).
+
+### Allowed Without Asking (Project/Plugin Creation Only)
+
+During **initial project or plugin creation**, AGENT may:
+
+- Run `git init` in the appropriate repo root
+- Add the standard `.gitignore` (`unity.gitignore` or `unreal.gitignore`)
+- Copy README/license templates into the new repo
+
+This applies when AGENT is executing a create/generate workflow (e.g. `generate_unity_project.ps1`, `generate_unreal_project.ps1`, or equivalent manual setup immediately after generation).
+
+### Requires User Permission
+
+AGENT must **not** perform these unless the user explicitly requests them:
+
+- `git commit` (local or otherwise)
+- `git push`
+- Creating a GitHub remote repository
+- Any operation that affects the **remote** repository
+- Branch operations intended for sharing (push, merge to shared branches, force push, etc.)
+
+**Clarification:** The restriction is **commits and pushes** — not `git init` or `.gitignore` setup during creation. Local commits are not automatic; ask first unless the user has explicitly requested a commit.
+
+### Safety Rules (Always)
+
+- **NEVER** delete a git repository from the user's GitHub account without explicit approval.
+- If git initialization fails, report the error and let the user decide next steps.
+
+### Cloud Agent Exception
+
+When operating as a cloud agent in unsupervised VM environments, see `AGENT Cloud Agents Rules.md` for feature-branch commit exceptions.
+
+---
+
+## Python Script Bulk-Edit Policy
+
+AGENT must **not** silently substitute a Python (or other shell) transformation script for direct editing of a text-based file when a large sequence of changes is requested.
+
+### Why This Matters
+
+Agents sometimes generate Python scripts to transform large files instead of editing them directly — often as a token-efficiency technique. In practice:
+
+- The failure rate for such scripts is **very high** (often >50%).
+- Recovery is poor because the agent deliberately avoided loading the full file into context.
+- Reverting damaged files is difficult without a known-good checkpoint.
+
+### Required Workflow Before Python Bulk Edits
+
+If AGENT is considering a Python script (or similar) to process **any text-based file** (source, shaders, markdown, config, JSON, YAML, etc.):
+
+1. **Prefer direct edit** when the file is reasonably sized or changes are localized.
+2. If a script still seems necessary, **ask the user for permission to create a local git commit** of the target file(s) first — so reversion is one command away if the script corrupts content.
+3. Do **not** run the script until the user approves that commit (or explicitly waives the safety commit).
+4. After running the script, verify the result (diff, spot-check, compile) before proceeding.
+
+### When Scripts Are Acceptable Without This Ask
+
+- The user **explicitly requested** a Python/script-based transformation.
+- The file is **generated output** not yet committed, with no risk to irreplaceable work.
+- The script only **reads** the file and does not write back to it.
+
+---

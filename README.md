@@ -12,7 +12,7 @@ A white-label template repository for cross-platform game engine plugin developm
 
 ### Setup Documentation
 - **CROSS-PLATFORM-GAME-ENGINE-PROJECT-SETUP-GUIDE.md** - Comprehensive guide for repository structure, Unity/Unreal project initialization, and automation recommendations
-- **AGENT_COMMANDS.md** - Standard commands for AI agents to understand project generation workflows
+- **AGENT_COMMANDS.md** - Standard commands for AI agents to understand project generation workflows, git permissions, and bulk-edit policy
 
 ### Submodules
 - **Unity_AutoCompilation/** - Git submodule containing the Unity automated compilation system (Unity-specific only; Unreal uses UBT out-of-the-box)
